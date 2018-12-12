@@ -3,6 +3,7 @@ const app = express()
 const bodyParser = require('body-parser')
 const morgan = require('morgan')
 const cors = require('cors')
+const Person = require('./models/person')
 
 app.use(cors())
 app.use(express.static('build'))
@@ -18,78 +19,37 @@ app.use(morgan(function (tokens, req, res) {
     tokens['response-time'](req, res), 'ms'
   ].join(' ')
 }))
-
-
-let persons = [
-    {
-      "name": "Arto Hellas",
-      "number": "040-123456",
-      "id": 1
-    },
-    {
-      "name": "Martti Tienari",
-      "number": "040-123456",
-      "id": 2
-    },
-    {
-      "name": "Arto Järvinen",
-      "number": "040-123456",
-      "id": 3
-    },
-    {
-      "name": "Lea Kutvonen",
-      "number": "040-123456",
-      "id": 4
-    },
-    {
-      "name": "Astia Hevonen",
-      "number": "045-222222",
-      "id": 6
-    },
-    {
-      "name": "Arttu Puukko",
-      "number": "33",
-      "id": 7
-    }
-  ]
   
-  const random = (n) => {
-        return Math.floor(Math.random()*n)
-  }
 
 app.get('/api/persons/:id', (request, response) => {
-	
-  const id = Number(request.params.id)
-  const person = persons.find(person => person.id === id )
-  if(person) {
-    response.json(person)
-  } else {
-    response.status(404).end()
-  }
+  Person
+    .findById(request.params.id)
+    .then(person => {
+      if (person) {
+        response.json(Person.format(person))
+      } else {
+        response.status(404).end()
+      }
+    })
+    .catch(error => {
+      console.log(error)
+      response.status(400).send({ error: 'malformatted id' })
+    })
 })
 
-app.delete('/api/persons/:id', (request, response) => {
-  const id = Number(request.params.id)
-  persons = persons.filter(person =>person.id !== id)
 
-  response.status(204).end()
+app.delete('/api/persons/:id', (request, response) => {
+  Person
+    .findByIdAndRemove(request.params.id)
+    .then(result => {
+      response.status(204).end()
+    })
+    .catch(error => {
+      response.status(400).send({ error: 'malformatted id' })
+    })
 })
 
 app.put('/api/persons/:id', (request, response) => {
-  const id = Number(request.params.id)
-  const person = persons.find(person => person.id === id )
-  const person2 = JSON.parse(JSON.stringify(request.body))
-  console.log(JSON.stringify(person),'->',JSON.stringify(person2))
-  if(person) {
-    person.number = person2.number
-    response.json(person)
-  }
-  else {
-   response.status(204).end()
-}
-})
-
-app.put('/api/persons2/:id', (request, response) => {
 
   const body = request.body
 
@@ -98,10 +58,10 @@ app.put('/api/persons2/:id', (request, response) => {
     number: body.number
   }
 
-  Note
+  Person
     .findByIdAndUpdate(request.params.id, person, { new: true } )
     .then(updatedPerson => {
-      response.json(updatedPerson)
+      response.json(Person.format(updatedPerson))
     })
     .catch(error => {
       console.log(error)
@@ -110,34 +70,45 @@ app.put('/api/persons2/:id', (request, response) => {
 })
 
 app.get('/info', (req, res) => {
-  res.send('<p>Puhelinluettelossa ' + persons.length + ' henkilön tiedot</p><p>'+new Date()+'</p>')
+ // res.send('<p>Puhelinluettelossa ' + persons.length + ' henkilön tiedot</p><p>'+new Date()+'</p>')
+  Person
+    .find({})
+    .then(persons => {
+      res.send('<p>Puhelinluettelossa ' + persons.length + ' henkilön tiedot</p><p>'+new Date()+'</p>')
+    })
 })
 
-app.get('/api/persons', (req, res) => {
-  res.json(persons)
+app.get('/api/persons', (request, response) => {
+  Person
+    .find({})
+    .then(persons => {
+      response.json(persons.map(Person.format))
+    })
 })
 
 app.post('/api/persons', (request, response) => {
 
-  const person = JSON.parse(JSON.stringify(request.body))
+  const body = request.body
 
-  person.id = random(1000000)
-
-  if (person.name === undefined) {
-    return response.status(400).json({error: 'Pahus, nimi puuttuu'})
+  if (body.name === undefined) {
+    return response.status(400).json({error: 'name missing'})
   }
-  if (person.number === undefined) {
-    return response.status(400).json({error: 'Voihan nenä, numero puuttuu'})
-  }
-  const found = persons.find(you => you.name === person.name)
-  if(found) {
-    return response.status(400).json({error: 'Hiisi vieköön, lisättävä nimi on jo luettelossa'})
+  if (body.number === undefined) {
+    return response.status(400).json({error: 'number missing'})
   }
 
-  persons = persons.concat(person)
+  const person = new Person({
+    name: body.name,
+    number: body.number
+  })
 
-  response.json(person)
+  person
+    .save()
+    .then(savedPerson => {
+      response.json(Person.format(savedPerson))
+    })
 })
+
 
 const PORT = process.env.PORT || 3001
 app.listen(PORT, () => {
