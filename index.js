@@ -75,6 +75,40 @@ app.delete('/api/persons/:id', (request, response) => {
   response.status(204).end()
 })
 
+app.put('/api/persons/:id', (request, response) => {
+  const id = Number(request.params.id)
+  const person = persons.find(person => person.id === id )
+  const person2 = JSON.parse(JSON.stringify(request.body))
+  console.log(JSON.stringify(person),'->',JSON.stringify(person2))
+  if(person) {
+    person.number = person2.number
+    response.json(person)
+  }
+  else {
+   response.status(204).end()
+}
+})
+
+app.put('/api/persons2/:id', (request, response) => {
+
+  const body = request.body
+
+  const person = {
+    name: body.name,
+    number: body.number
+  }
+
+  Note
+    .findByIdAndUpdate(request.params.id, person, { new: true } )
+    .then(updatedPerson => {
+      response.json(updatedPerson)
+    })
+    .catch(error => {
+      console.log(error)
+      response.status(400).send({ error: 'malformatted id' })
+    })
+})
+
 app.get('/info', (req, res) => {
   res.send('<p>Puhelinluettelossa ' + persons.length + ' henkilön tiedot</p><p>'+new Date()+'</p>')
 })
